@@ -1,3 +1,4 @@
+
 # JsonStructCpp
 实现结构体和json之间的自动转换
 
@@ -10,6 +11,7 @@ TBaseJsonStruct派生的结构体，以及他们的一维数组。
 使用TBaseJsonStruct作为父结构体派生出自己的结构体，或者直接使用
 JSONSTRUCT宏创建结构体，然后在结构体的构造函数中注册要转换到json中的
 成员变量。示例如下：
+```cpp
 JSONSTRUCT(testa)
 {
     int dkey1;
@@ -40,10 +42,11 @@ struct testb :public TBaseJsonStruct
         //intkey = {0};
     }
 };
-
+```
 之后就可以在任何需要的地点使用FromJson从字符串取值或者
 使用ToJson将结构体转化成json字符串。
 代码示例：
+```cpp
 int main()
 {
     testb testbbb;
@@ -64,7 +67,9 @@ int main()
     cout <<testbbb.ToJson()<< endl;
     return 0;
 }
+```
 运行结果：
+```
 src string:
 {"intkey":[5,10],"charkey":"charvalue","stringkey":"stringvalue","dkey":[{"dkey1":404,"dkey2":"dkey2value"}]}
 fromJson result:
@@ -78,3 +83,4 @@ fromJson result:
 
 toJson result:
 {"intkey":[5,10],"charkey":"charvalue","stringkey":"stringvalue","akeyNum":0}
+```
