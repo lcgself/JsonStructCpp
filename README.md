@@ -1,4 +1,3 @@
-
 # JsonStructCpp
 实现结构体和json之间的自动转换
 
@@ -6,7 +5,8 @@
 本质是实现了一个简化版的反射机制。
 目前为止，支持编译器内置类型、stl的string和自定义的，基于
 TBaseJsonStruct派生的结构体，以及他们的一维数组。
-
+##注意：由于内部使用了void* 转换，TBaseJsonStruct必须作为自定义结构体
+的第一父结构体。
 用法：
 使用TBaseJsonStruct作为父结构体派生出自己的结构体，或者直接使用
 JSONSTRUCT宏创建结构体，然后在结构体的构造函数中注册要转换到json中的
