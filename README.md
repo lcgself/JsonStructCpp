@@ -1,6 +1,8 @@
 # JsonStructCpp
 实现结构体和json之间的自动转换
 
+json转换部分基于cJSON，地址：https://github.com/DaveGamble/cJSON
+
 程序的目标是用一种“优雅”的方式实现结构体和json字符串之间的相互转换。
 本质是实现了一个简化版的反射机制。
 
