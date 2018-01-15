@@ -11,7 +11,7 @@
 #include <cxxabi.h>
 #include <stdlib.h>
 #endif
-#define JSON_STRUCT_DEBUG 1
+#define JSON_STRUCT_DEBUG 0
 #define JSONSUPPORT_POINT 0
 
 #if JSON_STRUCT_DEBUG
