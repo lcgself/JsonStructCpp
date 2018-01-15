@@ -11,7 +11,7 @@
 #include <cxxabi.h>
 #include <stdlib.h>
 #endif
-#define JSON_STRUCT_DEBUG 0
+#define JSON_STRUCT_DEBUG 1
 #define JSONSUPPORT_POINT 0
 
 #if JSON_STRUCT_DEBUG
@@ -254,7 +254,10 @@ static bool CheckJsonStructMemberType(std::string& name, TJsonStructMemberType& 
         }
     }
 #else
-    /** **/
+    /**
+    for win32 std::string = class std::basic_string<char,struct std::char_traits<char>,class std::allocator<char> >
+    struct= struct testd [5]
+    **/
     std::size_t ppos = std::string::npos;
 #if JSONSUPPORT_POINT == 0
     ppos = name.find('*');
@@ -298,7 +301,7 @@ static bool CheckJsonStructMemberType(std::string& name, TJsonStructMemberType& 
     {
         type.type = INT_TYPE;
     }
-    else if(!name.find("long long"))
+    else if(!name.find("__int64"))
     {//compare long long first
         type.type = LONGLONG_TYPE;
     }
@@ -318,63 +321,74 @@ static bool CheckJsonStructMemberType(std::string& name, TJsonStructMemberType& 
     {
         type.type = DOUBLE_TYPE;
     }
-    else if(!name.find("std::string"))
-    {
-        type.type = STRING_TYPE;
-    }
-    else if(!name.find("std"))
-    {//stl type
-            if(!name.find("std::set"))
-            {//std set
-                type.type = STL_SET;
-            }else if(!name.find("std::map"))
-            {//std map
-                type.type = STL_MAP;
-            }else if(!name.find("std::pair"))
-            {//std map
-                type.type = STL_PAIR;
-            }else if(!name.find("std::vector")
-                     || !name.find("std::list")
-                     || !name.find("std::deque"))
-            {//std map
-                type.type = STL_CONTAINER;
-            }else
-            {
-                //unsupported type
-                return false;
-            }
-    }
-    else
-    {
-        std::string checkstring;
-        if(0 != typestring.length())
+    else if(!name.find("class") || !name.find("struct"))
+    {//stl type begin with class, jsonstruct maybe struct or class
+        if(0 == typestring.length())
         {
-            checkstring = typestring;
+            return false;
+        }
+        std::string checkstring;
+        ppos = name.find(' ', ppos + 1);
+        if (std::string::npos != ppos)
+        {
+            checkstring = name.substr(0, ppos);
         }else
         {
             checkstring = name;
         }
-        std::map<std::string,TJsonStructDeriveInfo>::iterator it = memberName.begin();
-        it = memberName.find(checkstring);
-        if(it != memberName.end())
-        {
-            type.type = JSON_TYPE;
-            type.typeSize = it->second.typeSize;
-        }
-        else
-        {
-            //格式未识别
+        if(!checkstring.find("class std::basic_string"))
+        {//std string
+            type.type = STRING_TYPE;
+        }else if( !checkstring.find("class std::set"))
+        {//std set
+            type.type = STL_SET;
+            //TODO 暂不支持容器
             return false;
+        }else if(!checkstring.find("class std::map"))
+        {//std map
+            type.type = STL_MAP;
+            //TODO 暂不支持容器
+            return false;
+        }else if(!checkstring.find("struct std::pair"))
+        {//std map
+            type.type = STL_PAIR;
+            //TODO 暂不支持容器
+            return false;
+        }else if(!checkstring.find("class std::vector")
+                    || !checkstring.find("class std::list")
+                    || !checkstring.find("class std::deque"))
+        {//std map
+            type.type = STL_CONTAINER;
+            //TODO 暂不支持容器
+            return false;
+        }else
+        {
+            std::map<std::string,TJsonStructDeriveInfo>::iterator it = TBaseJsonStruct_private::derivesName.begin();
+            it = TBaseJsonStruct_private::derivesName.find(checkstring);
+            if(it != TBaseJsonStruct_private::derivesName.end())
+            {
+                type.type = JSON_TYPE;
+                type.typeSize = it->second.typeSize;
+            }
+            else
+            {
+                //格式未识别
+                return false;
+            }
         }
-
     }
-    if(0 != typestring.length())
+    else
     {
-        ppos = typestring.find('[');
+        //格式未识别
+        return false;
+    }
+    if(typestring != name)
+    {
+        ppos = name.find('[');
         if(std::string::npos != ppos)
         {
             type.isArray = true;
-            typestring = typestring.substr(ppos + 1, std::string::npos);
+            typestring = name.substr(ppos + 1, std::string::npos);
             type.arraySize = atoi(typestring.c_str());
         }
     }
@@ -706,7 +720,7 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                         cJSON *node = cJSON_CreateArray();
                         for(int arrIdx = 0; arrIdx < arraySize; ++arrIdx)
                         {
-                            void* pCurAddr = iteMember->pAddr + (arrIdx * iteMember->type.typeSize);
+                            void* pCurAddr = ((char*)iteMember->pAddr) + (arrIdx * iteMember->type.typeSize);
                             cJSON_AddItemToArray(node, ((TBaseJsonStruct*)pCurAddr)->ToJsonNode());
                         }
                         cJSON_AddItemToObject(root, iteMember->name.c_str(), node);
@@ -1132,7 +1146,7 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                     {
                         for(int arrIdx = 0; arrIdx < arraySize; ++arrIdx)
                         {
-                            void* pCurAddr = iteMember->pAddr + (arrIdx * iteMember->type.typeSize);
+                            void* pCurAddr = ((char*)iteMember->pAddr) + (arrIdx * iteMember->type.typeSize);
                             cJSON* arrNode = cJSON_GetArrayItem(node, arrIdx);
                             ((TBaseJsonStruct*)pCurAddr)->FromJsonNode(arrNode);
                         }
