@@ -5,7 +5,9 @@
 #include <typeinfo>
 
 #define JSONSTRUCT(x) struct x :public TBaseJsonStruct
-#define JSON_REGMEMBER(x) {RegMember(typeid(*this).name(),sizeof(*this),typeid(x).name(), #x, &x);}
+#define JSON_REGMEMBER(x) {RegMember(typeid(*this).name(),sizeof(*this),\
+                                     ((char*)((TBaseJsonStruct*)this)) - ((char*)this),\
+                                     typeid(x).name(), #x, &x);}
 
 struct TBaseJsonStruct_private;
 struct cJSON;
@@ -18,7 +20,7 @@ private:
     bool FromJsonNode(cJSON* root);
     cJSON* ToJsonNode();
 protected:
-    void RegMember(const char* szStructName, unsigned int structSize, const char* szTypeName, const char* szName, void* pAddr);
+    void RegMember(const char* szStructName, unsigned int structSize,unsigned int thisOffset, const char* szTypeName, const char* szName, void* pAddr);
 public:
     //公共接口
     std::string ToJson();

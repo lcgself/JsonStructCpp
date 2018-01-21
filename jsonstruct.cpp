@@ -45,15 +45,18 @@ struct TJsonStructMemberType
 {
     EMJsonStructValueType type;
     unsigned int typeSize;
+    unsigned int thisOffset;
     bool isArray;
     bool isPointer;
     bool isConst;
+    bool isUnsigned;
     std::size_t arraySize;
     TJsonStructMemberType* childType1;
     TJsonStructMemberType* childType2;
     TJsonStructMemberType():childType1(NULL),
         childType2(NULL),
         typeSize(0),
+        thisOffset(0),
         isArray(false),
         isPointer(false),
         isConst(false),
@@ -75,6 +78,7 @@ struct TJsonStructMemberType
 struct TJsonStructDeriveInfo
 {
     unsigned int typeSize;
+    unsigned int thisOffset;
 };
 struct TJsonStructBaseMember
 {
@@ -174,21 +178,31 @@ static bool CheckJsonStructMemberType(std::string& name, TJsonStructMemberType& 
     case 'b':
         type.type = BOOL_TYPE;
         break;
+    case 'h':
+        type.isUnsigned = true;
     case 'c':
         type.type = CHAR_TYPE;
         break;
+    case 't':
+        type.isUnsigned = true;
     case 'w':
         type.type = WCHAR_TYPE;
         break;
     case 's':
         type.type = SHORT_TYPE;
         break;
+    case 'j':
+        type.isUnsigned = true;
     case 'i':
         type.type = INT_TYPE;
         break;
+    case 'm':
+        type.isUnsigned = true;
     case 'l':
         type.type = LONG_TYPE;
         break;
+    case 'y':
+        type.isUnsigned = true;
     case 'x':
         type.type = LONGLONG_TYPE;
         break;
@@ -245,6 +259,7 @@ static bool CheckJsonStructMemberType(std::string& name, TJsonStructMemberType& 
             {
                 type.type = JSON_TYPE;
                 type.typeSize = it->second.typeSize;
+                type.thisOffset = it->second.thisOffset;
             }
             else
             {
@@ -403,22 +418,64 @@ bool SetJsonStructNumberValue(TJsonStructBaseMember& member, int intvalue, doubl
         *(bool*)member.pAddr = intvalue;
         break;
     case CHAR_TYPE:
-        *(char*)member.pAddr = intvalue;
+        if(member.type.isUnsigned)
+        {
+            *(unsigned char*)member.pAddr = intvalue;
+        }
+        else
+        {
+            *(char*)member.pAddr = intvalue;
+        }
         break;
     case WCHAR_TYPE:
-        *(wchar_t*)member.pAddr = intvalue;
+        if(member.type.isUnsigned)
+        {
+            *(unsigned wchar_t*)member.pAddr = intvalue;
+        }
+        else
+        {
+            *(wchar_t*)member.pAddr = intvalue;
+        }
         break;
     case SHORT_TYPE:
-        *(short*)member.pAddr = intvalue;
+        if(member.type.isUnsigned)
+        {
+            *(unsigned short*)member.pAddr = intvalue;
+        }
+        else
+        {
+            *(short*)member.pAddr = intvalue;
+        }
         break;
     case INT_TYPE:
-        *(int*)member.pAddr = intvalue;
+        if(member.type.isUnsigned)
+        {
+            *(unsigned int*)member.pAddr = intvalue;
+        }
+        else
+        {
+            *(int*)member.pAddr = intvalue;
+        }
         break;
     case LONG_TYPE:
-        *(long*)member.pAddr = intvalue;
+        if(member.type.isUnsigned)
+        {
+            *(unsigned long*)member.pAddr = doublevalue;
+        }
+        else
+        {
+            *(long*)member.pAddr = doublevalue;
+        }
         break;
     case LONGLONG_TYPE:
-        *(long long*)member.pAddr = intvalue;
+        if(member.type.isUnsigned)
+        {
+            *(unsigned long long*)member.pAddr = doublevalue;
+        }
+        else
+        {
+            *(long long*)member.pAddr = doublevalue;
+        }
         break;
     case FLOAT_TYPE:
         *(float*)member.pAddr = doublevalue;
@@ -480,12 +537,13 @@ TBaseJsonStruct::~TBaseJsonStruct()
 {
     delete privateValue;
 }
-void TBaseJsonStruct::RegMember(const char* szStructName, unsigned int structSize, const char* szTypeName, const char* szName, void* pAddr)
+void TBaseJsonStruct::RegMember(const char* szStructName, unsigned int structSize,unsigned int thisOffset, const char* szTypeName, const char* szName, void* pAddr)
 {
     TJsonStructBaseMember member ;
     member.typeName = szTypeName;
     TJsonStructDeriveInfo detiveInfo;
     detiveInfo.typeSize = structSize;
+    detiveInfo.thisOffset = thisOffset;
     TBaseJsonStruct_private::derivesName[szStructName] = detiveInfo;
     member.name = szName;
     member.pAddr = pAddr;
@@ -576,7 +634,14 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                 case CHAR_TYPE:
                     if(!arraySize)
                     {//not array
-                        cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(char*)iteMember->pAddr);
+                        if(iteMember->type.isUnsigned)
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(unsigned char*)iteMember->pAddr);
+                        }
+                        else
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(char*)iteMember->pAddr);
+                        }
                     }else
                     {
                         cJSON_AddStringToObject(root, iteMember->name.c_str(), ((char*)iteMember->pAddr));
@@ -585,7 +650,14 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                 case WCHAR_TYPE:
                     if(!arraySize)
                     {//not array
-                        cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(wchar_t*)iteMember->pAddr);
+                        if(iteMember->type.isUnsigned)
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(unsigned wchar_t*)iteMember->pAddr);
+                        }
+                        else
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(wchar_t*)iteMember->pAddr);
+                        }
                     }else
                     {
                         //" ERROR:do not support wchar_t now"
@@ -594,13 +666,27 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                 case SHORT_TYPE:
                     if(!arraySize)
                     {//not array
-                        cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(short*)iteMember->pAddr);
+                        if(iteMember->type.isUnsigned)
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(unsigned short*)iteMember->pAddr);
+                        }
+                        else
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(short*)iteMember->pAddr);
+                        }
                     }else
                     {
                         cJSON *node = cJSON_CreateArray();
                         for(int arrIdx = 0; arrIdx < arraySize; ++arrIdx)
                         {
-                            cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((short*)iteMember->pAddr) + arrIdx)));
+                            if(iteMember->type.isUnsigned)
+                            {
+                                cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((unsigned short*)iteMember->pAddr) + arrIdx)));
+                            }
+                            else
+                            {
+                                cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((short*)iteMember->pAddr) + arrIdx)));
+                            }
                         }
                         cJSON_AddItemToObject(root, iteMember->name.c_str(), node);
                     }
@@ -608,13 +694,27 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                 case INT_TYPE:
                     if(!arraySize)
                     {//not array
-                        cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(int*)iteMember->pAddr);
+                        if(iteMember->type.isUnsigned)
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(unsigned int*)iteMember->pAddr);
+                        }
+                        else
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(int*)iteMember->pAddr);
+                        }
                     }else
                     {
                         cJSON *node = cJSON_CreateArray();
                         for(int arrIdx = 0; arrIdx < arraySize; ++arrIdx)
                         {
-                            cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((int*)iteMember->pAddr) + arrIdx)));
+                            if(iteMember->type.isUnsigned)
+                            {
+                                cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((unsigned int*)iteMember->pAddr) + arrIdx)));
+                            }
+                            else
+                            {
+                                cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((int*)iteMember->pAddr) + arrIdx)));
+                            }
                         }
                         cJSON_AddItemToObject(root, iteMember->name.c_str(), node);
                     }
@@ -623,13 +723,27 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                     //TODO cjson只支持int
                     if(!arraySize)
                     {//not array
-                        cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(long*)iteMember->pAddr);
+                        if(iteMember->type.isUnsigned)
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(unsigned long*)iteMember->pAddr);
+                        }
+                        else
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(long*)iteMember->pAddr);
+                        }
                     }else
                     {
                         cJSON *node = cJSON_CreateArray();
                         for(int arrIdx = 0; arrIdx < arraySize; ++arrIdx)
                         {
-                            cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((long*)iteMember->pAddr) + arrIdx)));
+                            if(iteMember->type.isUnsigned)
+                            {
+                                cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((unsigned long*)iteMember->pAddr) + arrIdx)));
+                            }
+                            else
+                            {
+                                cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((long*)iteMember->pAddr) + arrIdx)));
+                            }
                         }
                         cJSON_AddItemToObject(root, iteMember->name.c_str(), node);
                     }
@@ -637,13 +751,27 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                 case LONGLONG_TYPE:
                     if(!arraySize)
                     {//not array
-                        cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(long long*)iteMember->pAddr);
+                        if(iteMember->type.isUnsigned)
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(unsigned long long*)iteMember->pAddr);
+                        }
+                        else
+                        {
+                            cJSON_AddNumberToObject(root, iteMember->name.c_str(), *(long long*)iteMember->pAddr);
+                        }
                     }else
                     {
                         cJSON *node = cJSON_CreateArray();
                         for(int arrIdx = 0; arrIdx < arraySize; ++arrIdx)
                         {
-                            cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((long long*)iteMember->pAddr) + arrIdx)));
+                            if(iteMember->type.isUnsigned)
+                            {
+                                cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((unsigned long long*)iteMember->pAddr) + arrIdx)));
+                            }
+                            else
+                            {
+                                cJSON_AddItemToArray(node, cJSON_CreateNumber(*(((long long*)iteMember->pAddr) + arrIdx)));
+                            }
                         }
                         cJSON_AddItemToObject(root, iteMember->name.c_str(), node);
                     }
@@ -710,7 +838,7 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                     {//not array
 #if JSON_STRUCT_DEBUG
 #endif // JSON_STRUCT_DEBUG
-                        cJSON *node = ((TBaseJsonStruct*)iteMember->pAddr)->ToJsonNode();
+                        cJSON *node = ((TBaseJsonStruct*)(void*)(((char*)iteMember->pAddr) + iteMember->type.thisOffset))->ToJsonNode();
                         if(node)
                         {
                             cJSON_AddItemToObject(root, iteMember->name.c_str(), node);
@@ -720,7 +848,7 @@ cJSON* TBaseJsonStruct::ToJsonNode()
                         cJSON *node = cJSON_CreateArray();
                         for(int arrIdx = 0; arrIdx < arraySize; ++arrIdx)
                         {
-                            void* pCurAddr = ((char*)iteMember->pAddr) + (arrIdx * iteMember->type.typeSize);
+                            void* pCurAddr = ((char*)iteMember->pAddr) + (arrIdx * iteMember->type.typeSize) + iteMember->type.thisOffset;
                             cJSON_AddItemToArray(node, ((TBaseJsonStruct*)pCurAddr)->ToJsonNode());
                         }
                         cJSON_AddItemToObject(root, iteMember->name.c_str(), node);
@@ -833,7 +961,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                             *(char*)iteMember->pAddr = 0;
                             break;
                         case cJSON_Number:
-                            *(char*)iteMember->pAddr = node->valueint;
+                            if(iteMember->type.isUnsigned)
+                            {
+                                *(unsigned char*)iteMember->pAddr = node->valueint;
+                            }
+                            else
+                            {
+                                *(char*)iteMember->pAddr = node->valueint;
+                            }
                             break;
                         case cJSON_String:
                             if(iteMember->type.isArray)
@@ -859,7 +994,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                                 *(((char*)iteMember->pAddr) + arrIdx) = 0;
                                 break;
                             case cJSON_Number:
-                                *(((char*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                if(iteMember->type.isUnsigned)
+                                {
+                                    *(((unsigned char*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                }
+                                else
+                                {
+                                    *(((char*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                }
                                 break;
                             case cJSON_String:
                                 *(((char*)iteMember->pAddr) + arrIdx) = arrNode->valuestring[0];
@@ -883,7 +1025,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                             *(short*)iteMember->pAddr = 0;
                             break;
                         case cJSON_Number:
-                            *(short*)iteMember->pAddr = node->valueint;
+                            if(iteMember->type.isUnsigned)
+                            {
+                                *(unsigned short*)iteMember->pAddr = node->valueint;
+                            }
+                            else
+                            {
+                                *(short*)iteMember->pAddr = node->valueint;
+                            }
                             break;
                         }
                     }else
@@ -900,7 +1049,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                                 *(((short*)iteMember->pAddr) + arrIdx) = 0;
                                 break;
                             case cJSON_Number:
-                                *(((short*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                if(iteMember->type.isUnsigned)
+                                {
+                                    *(((unsigned short*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                }
+                                else
+                                {
+                                    *(((short*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                }
                                 break;
                             }
                         }
@@ -918,7 +1074,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                             *(int*)iteMember->pAddr = 0;
                             break;
                         case cJSON_Number:
-                            *(int*)iteMember->pAddr = node->valueint;
+                            if(iteMember->type.isUnsigned)
+                            {
+                                *(unsigned int*)iteMember->pAddr = node->valuedouble;
+                            }
+                            else
+                            {
+                                *(int*)iteMember->pAddr = node->valueint;
+                            }
                             break;
                         }
                     }else
@@ -935,7 +1098,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                                 *(((int*)iteMember->pAddr) + arrIdx) = 0;
                                 break;
                             case cJSON_Number:
-                                *(((int*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                if(iteMember->type.isUnsigned)
+                                {
+                                    *(((unsigned int*)iteMember->pAddr) + arrIdx) = arrNode->valuedouble;
+                                }
+                                else
+                                {
+                                    *(((int*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                }
                                 break;
                             }
                         }
@@ -953,7 +1123,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                             *(long*)iteMember->pAddr = 0;
                             break;
                         case cJSON_Number:
-                            *(long*)iteMember->pAddr = node->valueint;
+                            if(iteMember->type.isUnsigned)
+                            {
+                                *(unsigned long*)iteMember->pAddr = node->valuedouble;
+                            }
+                            else
+                            {
+                                *(long*)iteMember->pAddr = node->valuedouble;
+                            }
                             break;
                         }
                     }else
@@ -970,7 +1147,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                                 *(((long*)iteMember->pAddr) + arrIdx) = 0;
                                 break;
                             case cJSON_Number:
-                                *(((long*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                if(iteMember->type.isUnsigned)
+                                {
+                                    *(((unsigned long*)iteMember->pAddr) + arrIdx) = arrNode->valuedouble;
+                                }
+                                else
+                                {
+                                    *(((long*)iteMember->pAddr) + arrIdx) = arrNode->valuedouble;
+                                }
                                 break;
                             }
                         }
@@ -988,7 +1172,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                             *(long long*)iteMember->pAddr = 0;
                             break;
                         case cJSON_Number:
-                            *(long long*)iteMember->pAddr = node->valueint;
+                            if(iteMember->type.isUnsigned)
+                            {
+                                *(unsigned long long*)iteMember->pAddr = node->valuedouble;
+                            }
+                            else
+                            {
+                                *(long long*)iteMember->pAddr = node->valuedouble;
+                            }
                             break;
                         }
                     }else
@@ -1005,7 +1196,14 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                                 *(((long long*)iteMember->pAddr) + arrIdx) = 0;
                                 break;
                             case cJSON_Number:
-                                *(((long long*)iteMember->pAddr) + arrIdx) = arrNode->valueint;
+                                if(iteMember->type.isUnsigned)
+                                {
+                                    *(((unsigned long long*)iteMember->pAddr) + arrIdx) = arrNode->valuedouble;
+                                }
+                                else
+                                {
+                                    *(((long long*)iteMember->pAddr) + arrIdx) = arrNode->valuedouble;
+                                }
                                 break;
                             }
                         }
@@ -1141,12 +1339,12 @@ bool TBaseJsonStruct::FromJsonNode(cJSON *root)
                     {//not array
 #if JSON_STRUCT_DEBUG
 #endif // JSON_STRUCT_DEBUG
-                        ((TBaseJsonStruct*)iteMember->pAddr)->FromJsonNode(node);
+                        ((TBaseJsonStruct*)((void*)(((char*)iteMember->pAddr)+iteMember->type.thisOffset)))->FromJsonNode(node);
                     }else
                     {
                         for(int arrIdx = 0; arrIdx < arraySize; ++arrIdx)
                         {
-                            void* pCurAddr = ((char*)iteMember->pAddr) + (arrIdx * iteMember->type.typeSize);
+                            void* pCurAddr = ((char*)iteMember->pAddr) + (arrIdx * iteMember->type.typeSize)+iteMember->type.thisOffset;
                             cJSON* arrNode = cJSON_GetArrayItem(node, arrIdx);
                             ((TBaseJsonStruct*)pCurAddr)->FromJsonNode(arrNode);
                         }
